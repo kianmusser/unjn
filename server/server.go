@@ -7,7 +7,7 @@ package server
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
+	"log"
 	"net/http"
 	"time"
 
@@ -15,15 +15,19 @@ import (
 	"github.com/mmcdole/gofeed"
 )
 
+// A JSON payload to send to ntfy.sh
 type NtfySubmission struct {
 	Topic   string `json:"topic"`
 	Message string `json:"message"`
 	Title   string `json:"title"`
 }
 
+// A parsed job description from Upwork
 type Job struct {
-	Title, Description, Link string
-	Date                     time.Time
+	Title       string
+	Description string
+	Link        string
+	Date        time.Time
 }
 
 type Server struct {
@@ -36,8 +40,10 @@ type Server struct {
 func (s *Server) ParseRssFeed(rssUrl string) []Job {
 	feed, err := s.feedParser.ParseURL(rssUrl)
 	if err != nil {
-		panic(err)
+		log.Printf("error retrieving RSS feed: %s\n", err)
+		return []Job{}
 	}
+
 	jobs := make([]Job, len(feed.Items))
 	for i, f := range feed.Items {
 		cur := Job{
@@ -52,7 +58,6 @@ func (s *Server) ParseRssFeed(rssUrl string) []Job {
 }
 
 func (s *Server) Notify(job Job) {
-	fmt.Printf("Title: %s\n", job.Title)
 	req := NtfySubmission{Topic: s.ntfyTopic, Title: job.Title, Message: job.Description}
 	reqBytes, err := json.Marshal(req)
 	if err != nil {
@@ -66,7 +71,7 @@ func (s *Server) Notify(job Job) {
 }
 
 func (s *Server) Fetch() {
-	fmt.Println("fetching...")
+	log.Println("fetching...")
 	for _, url := range s.upworkRssUrls {
 		jobs := s.ParseRssFeed(url)
 		for _, job := range jobs {
