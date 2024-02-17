@@ -1,11 +1,21 @@
 package server
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"time"
 
+	"github.com/k3a/html2text"
 	"github.com/mmcdole/gofeed"
 )
+
+type NtfySubmission struct {
+	Topic   string `json:"topic"`
+	Message string `json:"message"`
+	Title   string `json:"title"`
+}
 
 type Job struct {
 	Title, Description, Link string
@@ -28,7 +38,7 @@ func (s *Server) ParseRssFeed(rssUrl string) []Job {
 	for i, f := range feed.Items {
 		cur := Job{
 			Title:       f.Title,
-			Description: f.Description,
+			Description: html2text.HTML2Text(f.Description),
 			Link:        f.Link,
 			Date:        *f.PublishedParsed,
 		}
@@ -39,6 +49,16 @@ func (s *Server) ParseRssFeed(rssUrl string) []Job {
 
 func (s *Server) Notify(job Job) {
 	fmt.Printf("Title: %s\n", job.Title)
+	req := NtfySubmission{Topic: s.ntfyTopic, Title: job.Title, Message: job.Description}
+	reqBytes, err := json.Marshal(req)
+	if err != nil {
+		panic(err)
+	}
+	resp, err := http.Post("https://ntfy.sh", "application/json", bytes.NewBuffer(reqBytes))
+	if err != nil {
+		panic(err)
+	}
+	defer resp.Body.Close()
 }
 
 func (s *Server) Fetch() {
@@ -55,7 +75,7 @@ func (s *Server) Fetch() {
 }
 
 func (s *Server) Run() {
-	ticker := time.NewTicker(5 * time.Second)
+	ticker := time.NewTicker(10 * time.Minute)
 	s.Fetch()
 	for {
 		<-ticker.C
