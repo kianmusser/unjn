@@ -1,5 +1,6 @@
 /*
 Copyright © 2024 Kian Musser
+Freely available under the MIT license
 */
 package cmd
 
